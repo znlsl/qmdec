@@ -35,17 +35,26 @@ def _api_call(data, cookie="", timeout=10):
 
 
 def fetch_song_detail(song_mid: str, cookie: str = "", uin: str = "") -> dict | None:
+    """Fetch song info by searching with song_mid, requires cookie."""
+    from .cli import load_config
+    if not cookie:
+        cfg = load_config()
+        cookie = cfg.get("cookie", "")
+        uin = cfg.get("uin", "")
     data = {
-        "comm": {"cv": 4747474, "ct": 24, "format": "json", "uin": int(uin or 0)},
+        "comm": {"cv": 4747474, "ct": 24, "format": "json", "uin": int(uin or 0), "g_tk": 5381},
         "req_1": {
             "module": "music.search.SearchCgiService",
             "method": "DoSearchForQQMusicDesktop",
-            "param": {"query": song_mid, "page_num": 1, "num_per_page": 1, "search_type": 0},
+            "param": {"query": song_mid, "page_num": 1, "num_per_page": 5, "search_type": 0},
         },
     }
     try:
         r = _api_call(data, cookie)
         songs = r["req_1"]["data"]["body"]["song"]["list"]
+        for s in songs:
+            if s.get("mid") == song_mid:
+                return s
         if songs:
             return songs[0]
     except Exception:
@@ -130,9 +139,9 @@ def fetch_cover(url: str) -> bytes | None:
         return None
 
 
-def fetch_metadata(song_mid: str) -> dict | None:
-    """Legacy compat: fetch metadata by song_mid via search."""
-    detail = fetch_song_detail(song_mid)
+def fetch_metadata(song_mid: str, cookie: str = "", uin: str = "") -> dict | None:
+    """Fetch metadata by song_mid via search API."""
+    detail = fetch_song_detail(song_mid, cookie, uin)
     if not detail:
         return None
     meta = fetch_metadata_from_album_song(detail)
@@ -147,7 +156,7 @@ def write_metadata(filepath: Path, song_mid: str, meta: dict | None = None,
     year, genre, lyrics, artwork, comment (language).
     """
     if meta is None:
-        meta = fetch_metadata(song_mid)
+        meta = fetch_metadata(song_mid, cookie, uin)
     if meta is None:
         return {"ok": False, "error": "metadata not found"}
 

@@ -423,7 +423,7 @@ def cmd_download(args: argparse.Namespace) -> None:
         print(f"  Decrypting...", file=sys.stderr)
         audio_size = tmp_path.stat().st_size
         result = _decrypt_with_ekey(tmp_path, output_dir, info["ekey"], audio_size,
-                                    song["song_mid"], args.no_tag)
+                                    song["song_mid"], True)
 
         # Verify decryption succeeded (check output file header)
         decrypt_ok = False
@@ -440,6 +440,14 @@ def cmd_download(args: argparse.Namespace) -> None:
         tmp_path.unlink(missing_ok=True)
 
         if decrypt_ok:
+            if not args.no_tag:
+                try:
+                    from .metadata import write_metadata, fetch_metadata_from_album_song
+                    meta = fetch_metadata_from_album_song(song.get("_raw", {})) if song.get("_raw") else None
+                    write_metadata(Path(result["output"]), song["song_mid"], meta=meta,
+                                   cookie=cookie, uin=uin)
+                except Exception:
+                    pass
             print(json.dumps({"ok": True, "output": result["output"], "format": result["format"],
                              "title": song["title"], "singer": song["singer"], "tag": result.get("tag")}))
         else:
@@ -454,8 +462,10 @@ def cmd_download(args: argparse.Namespace) -> None:
                     tag_result = None
                     if not args.no_tag:
                         try:
-                            from .metadata import write_metadata
-                            tag_result = write_metadata(out_path, song["song_mid"])
+                            from .metadata import write_metadata, fetch_metadata_from_album_song
+                            meta = fetch_metadata_from_album_song(song.get("_raw", {})) if song.get("_raw") else None
+                            tag_result = write_metadata(out_path, song["song_mid"], meta=meta,
+                                                       cookie=cookie, uin=uin)
                         except Exception as e:
                             tag_result = {"ok": False, "error": str(e)}
                     print(json.dumps({"ok": True, "output": str(out_path), "format": "mp3",
@@ -486,8 +496,10 @@ def cmd_download(args: argparse.Namespace) -> None:
         tag_result = None
         if not args.no_tag:
             try:
-                from .metadata import write_metadata
-                tag_result = write_metadata(out_path, song["song_mid"])
+                from .metadata import write_metadata, fetch_metadata_from_album_song
+                meta = fetch_metadata_from_album_song(song.get("_raw", {})) if song.get("_raw") else None
+                tag_result = write_metadata(out_path, song["song_mid"], meta=meta,
+                                            cookie=cookie, uin=uin)
             except Exception as e:
                 tag_result = {"ok": False, "error": str(e)}
 
